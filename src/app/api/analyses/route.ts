@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: "Sign in to analyze charts." }, { status: 401 });
     if (!user.isActive) return NextResponse.json({ error: "An active subscription is required." }, { status: 403 });
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY?.trim().replace(/^Bearer\s+/i, "").replace(/^['"]|['"]$/g, "");
     if (!apiKey) return NextResponse.json({ error: "AI analysis is not configured yet." }, { status: 503 });
 
     const form = await request.formData();
