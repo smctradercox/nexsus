@@ -70,6 +70,11 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void
     } finally { setBusy(false); }
   }
 
+  async function clearSession() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setError("");
+  }
+
   return (
     <main className="auth-page">
       <div className="auth-grid" aria-hidden="true" />
@@ -95,6 +100,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void
           </form>
           <div className="auth-switch"><span>{mode === "login" ? "New to NEXUS?" : "Already have an account?"}<button type="button" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>{mode === "login" ? "Create account" : "Sign in"}</button></span></div>
           <div className="auth-secure"><ShieldCheck size={15} /> Encrypted session · Private workspace</div>
+          <button className="auth-clear-session" type="button" onClick={clearSession}>Clear saved session</button>
         </GlassPanel>
       </motion.section>
       <div className="auth-foot"><span>NEXUS TERMINAL</span><span>Independent market analysis</span><span>01 — 03</span></div>
