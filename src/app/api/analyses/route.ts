@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { and, count, desc, eq, gte } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -26,6 +25,8 @@ const responseSchema = z.object({
 });
 
 const prompt = `Analyze only what is clearly visible in this trading chart image. Assess support and resistance, market structure, liquidity, trendlines, and candlestick patterns. Never invent prices or claim certainty when labels are unreadable. Return only JSON matching this shape: {"marketBias":"Bullish|Bearish|Neutral","supportLevels":["visible level"],"resistanceLevels":["visible level"],"entryZone":null,"stopLoss":null,"takeProfit":[],"technicalSummary":"...","strategyAdvice":"..."}. Use null for an unclear entry or stop; use empty arrays when levels cannot be read. This is educational chart analysis, not financial advice.`;
+
+type GeminiResponse = { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>; error?: { message?: string } };
 
 function hasImageSignature(bytes: Buffer, mimeType: string) {
   if (mimeType === "image/png") {
@@ -86,15 +87,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Daily analysis limit reached. Try again tomorrow." }, { status: 429 });
     }
 
-    const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
-      model: "gemini-3.8-flash",
-      generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+    const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { text: prompt },
+          { inline_data: { mime_type: chart.type, data: image.toString("base64") } },
+        ] }],
+        generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+      }),
+      cache: "no-store",
     });
-    const generated = await model.generateContent([
-      { text: prompt },
-      { inlineData: { mimeType: chart.type, data: image.toString("base64") } },
-    ]);
-    const parsedResult = responseSchema.safeParse(JSON.parse(generated.response.text()));
+    const geminiData = await geminiResponse.json() as GeminiResponse;
+    if (!geminiResponse.ok) {
+      console.error("Gemini request failed", geminiResponse.status, geminiData.error?.message ?? "unknown error");
+      return NextResponse.json({ error: "AI provider rejected the request. Check GEMINI_API_KEY in the deployment settings." }, { status: 502 });
+    }
+    const generatedText = geminiData.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
+    if (!generatedText) return NextResponse.json({ error: "The AI returned an empty analysis. Please retry." }, { status: 502 });
+    const parsedResult = responseSchema.safeParse(JSON.parse(generatedText));
     if (!parsedResult.success) {
       return NextResponse.json({ error: "The AI returned an unreadable analysis. Please retry with a clearer chart." }, { status: 502 });
     }
