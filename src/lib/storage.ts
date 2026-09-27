@@ -1,10 +1,23 @@
 import "server-only";
 import { v2 as cloudinary } from "cloudinary";
 
+function clean(value: string | undefined) {
+  return value?.trim().replace(/^['"]|['"]$/g, "");
+}
+
 function getStorage() {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  const cloudinaryUrl = clean(process.env.CLOUDINARY_URL);
+  let cloudName = clean(process.env.CLOUDINARY_CLOUD_NAME);
+  let apiKey = clean(process.env.CLOUDINARY_API_KEY);
+  let apiSecret = clean(process.env.CLOUDINARY_API_SECRET);
+
+  if (cloudinaryUrl) {
+    const parsed = new URL(cloudinaryUrl);
+    cloudName = parsed.hostname;
+    apiKey = decodeURIComponent(parsed.username);
+    apiSecret = decodeURIComponent(parsed.password);
+  }
+
   if (!cloudName || !apiKey || !apiSecret) {
     throw new Error("Cloudinary storage is not configured");
   }
