@@ -27,6 +27,11 @@ const responseSchema = z.object({
 const prompt = `Analyze only what is clearly visible in this trading chart image. Assess support and resistance, market structure, liquidity, trendlines, and candlestick patterns. Never invent prices or claim certainty when labels are unreadable. Return only JSON matching this shape: {"marketBias":"Bullish|Bearish|Neutral","supportLevels":["visible level"],"resistanceLevels":["visible level"],"entryZone":null,"stopLoss":null,"takeProfit":[],"technicalSummary":"...","strategyAdvice":"..."}. Use null for an unclear entry or stop; use empty arrays when levels cannot be read. This is educational chart analysis, not financial advice.`;
 
 type GeminiResponse = { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>; error?: { message?: string } };
+const geminiModels = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash"];
+function isUploadedImage(value: FormDataEntryValue | null): value is File {
+  return value !== null && typeof value === "object" &&
+    typeof value.arrayBuffer === "function" && typeof value.size === "number" && typeof value.type === "string";
+}
 
 function hasImageSignature(bytes: Buffer, mimeType: string) {
   if (mimeType === "image/png") {
@@ -67,7 +72,7 @@ export async function POST(request: Request) {
 
     const form = await request.formData();
     const chart = form.get("chart");
-    if (!(chart instanceof File) || chart.size === 0) {
+    if (!isUploadedImage(chart) || chart.size === 0) {
       return NextResponse.json({ error: "Choose a chart screenshot." }, { status: 400 });
     }
     if (!chartTypes.has(chart.type) || chart.size > MAX_CHART_BYTES) {
@@ -87,25 +92,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Daily analysis limit reached. Try again tomorrow." }, { status: 429 });
     }
 
-    const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [
-          { text: prompt },
-          { inline_data: { mime_type: chart.type, data: image.toString("base64") } },
-        ] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
-      }),
-      cache: "no-store",
-    });
-    const geminiData = await geminiResponse.json() as GeminiResponse;
-    if (!geminiResponse.ok) {
-      console.error("Gemini request failed", geminiResponse.status, geminiData.error?.message ?? "unknown error");
-      return NextResponse.json({ error: "AI provider rejected the request. Check GEMINI_API_KEY in the deployment settings." }, { status: 502 });
+    let generatedText = "";
+    let lastGeminiError = "";
+    for (const model of geminiModels) {
+      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { text: prompt },
+            { inline_data: { mime_type: chart.type, data: image.toString("base64") } },
+          ] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+        }),
+        cache: "no-store",
+      });
+      const geminiData = await geminiResponse.json() as GeminiResponse;
+      if (geminiResponse.ok) {
+        generatedText = geminiData.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim() ?? "";
+        if (generatedText) break;
+      }
+      lastGeminiError = `${geminiResponse.status} ${geminiData.error?.message ?? "unknown error"}`;
+      if (geminiResponse.status !== 429 && geminiResponse.status !== 500 && geminiResponse.status !== 503) break;
     }
-    const generatedText = geminiData.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
-    if (!generatedText) return NextResponse.json({ error: "The AI returned an empty analysis. Please retry." }, { status: 502 });
+    if (!generatedText) {
+      console.error("Gemini request failed across fallback models", lastGeminiError);
+      return NextResponse.json({ error: "The AI provider is temporarily busy. Please retry in a moment." }, { status: 502 });
+    }
     const parsedResult = responseSchema.safeParse(JSON.parse(generatedText));
     if (!parsedResult.success) {
       return NextResponse.json({ error: "The AI returned an unreadable analysis. Please retry with a clearer chart." }, { status: 502 });

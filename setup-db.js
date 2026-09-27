@@ -53,6 +53,31 @@ async function main() {
       ) THEN
         ALTER TABLE "users" ADD COLUMN "subscription_expires_at" timestamp with time zone;
       END IF;
+
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'payments' AND column_name = 'receipt_url'
+      ) THEN
+        ALTER TABLE "payments" ADD COLUMN "receipt_url" text;
+        UPDATE "payments" SET "receipt_url" = COALESCE("screenshot_url", 'legacy:unknown') WHERE "receipt_url" IS NULL;
+        ALTER TABLE "payments" ALTER COLUMN "receipt_url" SET NOT NULL;
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'payments' AND column_name = 'reviewed_at'
+      ) THEN
+        ALTER TABLE "payments" ADD COLUMN "reviewed_at" timestamp with time zone;
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'analyses' AND column_name = 'ai_response_json'
+      ) THEN
+        ALTER TABLE "analyses" ADD COLUMN "ai_response_json" jsonb;
+        UPDATE "analyses" SET "ai_response_json" = COALESCE(NULLIF("result_json", '')::jsonb, '{}'::jsonb) WHERE "ai_response_json" IS NULL;
+        ALTER TABLE "analyses" ALTER COLUMN "ai_response_json" SET NOT NULL;
+      END IF;
     END $$;
   `);
 
