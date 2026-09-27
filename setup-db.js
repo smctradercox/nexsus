@@ -78,6 +78,13 @@ async function main() {
         UPDATE "analyses" SET "ai_response_json" = COALESCE(NULLIF("result_json", '')::jsonb, '{}'::jsonb) WHERE "ai_response_json" IS NULL;
         ALTER TABLE "analyses" ALTER COLUMN "ai_response_json" SET NOT NULL;
       END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'analyses' AND column_name = 'result_json'
+      ) THEN
+        ALTER TABLE "analyses" ALTER COLUMN "result_json" DROP NOT NULL;
+      END IF;
     END $$;
   `);
 
