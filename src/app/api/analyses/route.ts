@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import dns from "node:dns";
 import { and, count, desc, eq, gte } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -10,6 +11,8 @@ import { removeChartImage, storeChartImage } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+dns.setDefaultResultOrder("ipv4first");
 
 const MAX_CHART_BYTES = 4 * 1024 * 1024;
 const chartTypes = new Set(["image/jpeg", "image/png"]);
