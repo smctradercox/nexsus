@@ -30,7 +30,7 @@ const responseSchema = z.object({
 const prompt = `Analyze only what is clearly visible in this trading chart image. Assess support and resistance, market structure, liquidity, trendlines, and candlestick patterns. Never invent prices or claim certainty when labels are unreadable. Return only JSON matching this shape: {"marketBias":"Bullish|Bearish|Neutral","supportLevels":["visible level"],"resistanceLevels":["visible level"],"entryZone":null,"stopLoss":null,"takeProfit":[],"technicalSummary":"...","strategyAdvice":"..."}. Use null for an unclear entry or stop; use empty arrays when levels cannot be read. This is educational chart analysis, not financial advice.`;
 
 type GeminiResponse = { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>; error?: { message?: string } };
-const geminiModels = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash"];
+const geminiModels = ["gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.8-flash"];
 function isUploadedImage(value: FormDataEntryValue | null): value is File {
   return value !== null && typeof value === "object" &&
     typeof value.arrayBuffer === "function" && typeof value.size === "number" && typeof value.type === "string";
