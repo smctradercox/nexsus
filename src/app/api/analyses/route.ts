@@ -30,7 +30,7 @@ const responseSchema = z.object({
 const prompt = `Analyze only what is clearly visible in this trading chart image. Assess support and resistance, market structure, liquidity, trendlines, and candlestick patterns. Never invent prices or claim certainty when labels are unreadable. Return only JSON matching this shape: {"marketBias":"Bullish|Bearish|Neutral","supportLevels":["visible level"],"resistanceLevels":["visible level"],"entryZone":null,"stopLoss":null,"takeProfit":[],"technicalSummary":"...","strategyAdvice":"..."}. Use null for an unclear entry or stop; use empty arrays when levels cannot be read. This is educational chart analysis, not financial advice.`;
 
 type GeminiResponse = { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>; error?: { message?: string } };
-const geminiModels = ["gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.8-flash"];
+const geminiModels = ["gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.8-flash"];
 function isUploadedImage(value: FormDataEntryValue | null): value is File {
   return value !== null && typeof value === "object" &&
     typeof value.arrayBuffer === "function" && typeof value.size === "number" && typeof value.type === "string";
@@ -122,7 +122,8 @@ export async function POST(request: Request) {
       console.error("Gemini request failed across fallback models", lastGeminiError);
       return NextResponse.json({ error: "The AI provider is temporarily busy. Please retry in a moment." }, { status: 502 });
     }
-    const parsedResult = responseSchema.safeParse(JSON.parse(generatedText));
+    const jsonText = generatedText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    const parsedResult = responseSchema.safeParse(JSON.parse(jsonText));
     if (!parsedResult.success) {
       return NextResponse.json({ error: "The AI returned an unreadable analysis. Please retry with a clearer chart." }, { status: 502 });
     }
