@@ -27,7 +27,7 @@ const responseSchema = z.object({
   strategyAdvice: z.string().min(1).max(1600),
 });
 
-const prompt = `You are an expert ICT, Smart Money Concepts (SMC), and Price Action technical analyst. Analyze only what is clearly visible in this trading chart image. Guidelines: 1. Strategy Integration: Analyze market structure (BOS, CHoCH), Order Blocks (OB), Fair Value Gaps (FVG), Liquidity Sweeps (BSL/SSL), Support & Resistance, and Candlestick Price Action patterns. 2. Fixed Risk-to-Reward (1:3): Calculate Stop Loss (SL) based on invalidation structures (above/below Order Block or Swing High/Low). Take Profit (TP) MUST be calculated to ensure a strict 1:3 Risk-to-Reward Ratio (TP distance = 3x SL distance). 3. Precision: Never invent prices. If labels/levels are unreadable, set entryZone or stopLoss to null and takeProfit to empty array. Return ONLY a JSON matching this exact shape: {"marketBias":"Bullish|Bearish|Neutral","supportLevels":["visible level"],"resistanceLevels":["visible level"],"entryZone":"exact price or zone","stopLoss":"exact SL price","takeProfit":["TP1 price (1:3 R:R)"],"technicalSummary":"SMC & Price Action structural analysis","strategyAdvice":"Execution steps & 1:3 R:R risk management advice"}. This is educational chart analysis, not financial advice.`;
+const prompt = `You are an expert ICT, Smart Money Concepts (SMC), and Price Action technical analyst. Analyze only what is clearly visible in this trading chart image. Guidelines: 1. Strategy Integration: Analyze market structure (BOS, CHoCH), Order Blocks (OB), Fair Value Gaps (FVG), Liquidity Sweeps (BSL/SSL), Support & Resistance, and Candlestick Price Action patterns. 2. Fixed Risk-to-Reward (1:3): Calculate Stop Loss (SL) based on invalidation structures (above/below Order Block or Swing High/Low). Take Profit (TP) MUST be calculated to ensure a strict 1:3 Risk-to-Reward Ratio (TP distance = 3x SL distance). 3. Precision: Never invent prices. If labels/levels are unreadable, set entryZone or stopLoss to null and takeProfit to empty array. 4. Language Requirement: Write technicalSummary and strategyAdvice strictly in clear, professional Arabic using standard SMC/Price Action trading terminology (e.g., كسر هيكل, منطقة طلب, سحب سيولة, إدارة مخاطر). Return ONLY a JSON matching this exact shape: {"marketBias":"Bullish|Bearish|Neutral","supportLevels":["visible level"],"resistanceLevels":["visible level"],"entryZone":"exact price or zone","stopLoss":"exact SL price","takeProfit":["TP1 price (1:3 R:R)"],"technicalSummary":"SMC & Price Action structural analysis in Arabic","strategyAdvice":"Execution steps & 1:3 R:R risk management advice in Arabic"}. This is educational chart analysis, not financial advice.`;
 
 type GeminiResponse = { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>; error?: { message?: string } };
 const geminiModels = ["gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.8-flash"];
@@ -53,7 +53,7 @@ export async function GET() {
       result: analyses.aiResponseJson,
       createdAt: analyses.createdAt,
     }).from(analyses).where(eq(analyses.userId, user.id))
-      .orderBy(desc(analyses.createdAt)).limit(20);
+      .orderBy(desc(analyses.createdAt)).limit(30);
 
     return NextResponse.json({ analyses: history });
   } catch (error) {
@@ -91,8 +91,8 @@ export async function POST(request: Request) {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const [dailyCount] = await db.select({ value: count() }).from(analyses)
       .where(and(eq(analyses.userId, user.id), gte(analyses.createdAt, since)));
-    if (dailyCount.value >= 20) {
-      return NextResponse.json({ error: "Daily analysis limit reached. Try again tomorrow." }, { status: 429 });
+    if (dailyCount.value >= 30) {
+      return NextResponse.json({ error: "Daily analysis limit reached (30/30). Try again tomorrow." }, { status: 429 });
     }
 
     let generatedText = "";

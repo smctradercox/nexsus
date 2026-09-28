@@ -5,7 +5,7 @@ import {
   Activity, ArrowDownRight, ArrowRight, ArrowUpRight, BarChart3, Check,
   CheckCircle2, Clock3, Copy, CreditCard, FileImage, KeyRound,
   LayoutDashboard, LogOut, ShieldCheck, Sparkles, Upload, UserRound,
-  Wallet, X, Zap,
+  Wallet, X, Zap, Menu
 } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 
@@ -186,6 +186,7 @@ export default function NexusDashboard({ walletAddress, walletQr }: { walletAddr
   const [receiptBusy, setReceiptBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [reviewingId, setReviewingId] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -269,18 +270,34 @@ export default function NexusDashboard({ walletAddress, walletQr }: { walletAddr
   return (
     <main className="app-shell">
       <div className="app-grain" aria-hidden="true" />
-      <aside className="sidebar">
+      <aside className={`sidebar ${mobileMenuOpen ? "sidebar-mobile-open" : ""}`}>
         <a className="brand-mark sidebar-brand" href="/" aria-label="NEXUS home"><span className="brand-glyph"><Activity size={18} strokeWidth={2.4} /></span><span>NEXUS<span className="brand-period">.</span></span></a>
         <div className="workspace-label"><span className="eyebrow">WORKSPACE</span><span className="workspace-live"><span /> LIVE</span></div>
         <nav className="side-nav" aria-label="Main navigation">
-          {navItems.map((item) => <button key={item.id} className={`nav-item ${view === item.id ? "nav-item-active" : ""}`} onClick={() => setView(item.id)}><item.icon size={17} strokeWidth={1.8} /><span>{item.label}</span>{item.id === "analysis" && analyses.length > 0 && <span className="nav-count">{analyses.length}</span>}</button>)}
-          {user.isAdmin && <button className={`nav-item ${view === "admin" ? "nav-item-active" : ""}`} onClick={() => setView("admin")}><ShieldCheck size={17} strokeWidth={1.8} /><span>Payment review</span>{adminPayments.length > 0 && <span className="nav-count nav-count-alert">{adminPayments.length}</span>}</button>}
+          {navItems.map((item) => <button key={item.id} className={`nav-item ${view === item.id ? "nav-item-active" : ""}`} onClick={() => { setView(item.id); setMobileMenuOpen(false); }}><item.icon size={17} strokeWidth={1.8} /><span>{item.label}</span>{item.id === "analysis" && analyses.length > 0 && <span className="nav-count">{analyses.length}</span>}</button>)}
+          {user.isAdmin && <button className={`nav-item ${view === "admin" ? "nav-item-active" : ""}`} onClick={() => { setView("admin"); setMobileMenuOpen(false); }}><ShieldCheck size={17} strokeWidth={1.8} /><span>Payment review</span>{adminPayments.length > 0 && <span className="nav-count nav-count-alert">{adminPayments.length}</span>}</button>}
         </nav>
         <div className="sidebar-bottom"><div className="plan-mini"><div className="plan-mini-icon"><Zap size={16} /></div><div><span className="eyebrow">YOUR PLAN</span><strong>{subscriptionStatus === "active" ? "NEXUS Pro" : (statusLabels[subscriptionStatus] || statusLabels["active"] || "ACTIVE")}</strong></div><span className={`plan-indicator plan-${subscriptionStatus}`} /></div><div className="profile-row"><div className="avatar">{user.username.slice(0, 1).toUpperCase()}</div><div className="profile-copy"><strong>{user.username}</strong><span>{user.isAdmin ? "Administrator" : "Member"}</span></div><button className="icon-button signout-button" aria-label="Sign out" title="Sign out" onClick={signOut}><LogOut size={16} /></button></div></div>
       </aside>
 
       <section className="main-column">
-        <header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>{navItems.find((item) => item.id === view)?.label ?? "Payment review"}</strong></div><div className="topbar-right"><div className="market-live"><span className="pulse-dot" /> SYSTEM ONLINE</div><StatusPill status={subscriptionStatus} /><div className="top-avatar">{user.username.slice(0, 1).toUpperCase()}</div></div></header>
+        <header className="topbar">
+          <div className="topbar-left" style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <button className="icon-button mobile-toggle" aria-label="Toggle menu" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+            <div className="breadcrumb"><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>{navItems.find((item) => item.id === view)?.label ?? "Payment review"}</strong></div>
+          </div>
+          <div className="topbar-right">
+            <div className="market-live"><span className="pulse-dot" /> SYSTEM ONLINE</div>
+            <StatusPill status={subscriptionStatus} />
+            <button className="icon-button mobile-signout" aria-label="Sign out" title="Sign out" onClick={signOut} style={{ marginLeft: "0.25rem" }}>
+              <LogOut size={16} />
+            </button>
+            <div className="top-avatar">{user.username.slice(0, 1).toUpperCase()}</div>
+          </div>
+        </header>
+
         {notice && <motion.div className={`notice notice-${notice.kind}`} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} role="status"><span>{notice.kind === "success" ? <CheckCircle2 size={17} /> : <X size={17} />}{notice.text}</span><button aria-label="Dismiss notification" onClick={() => setNotice(null)}><X size={15} /></button></motion.div>}
 
         <motion.div className="content-area" key={view} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }}>
@@ -312,8 +329,7 @@ export default function NexusDashboard({ walletAddress, walletQr }: { walletAddr
 
           {view === "admin" && user.isAdmin && <>
             <div className="page-heading"><div><span className="eyebrow">ADMIN / PAYMENT OPERATIONS</span><h1>Review <span>transfers.</span></h1><p>Verify the transaction screenshot in Telegram before taking action.</p></div><div className="heading-date"><span className="date-mark" /><span>REVIEW QUEUE <strong>{adminPayments.length.toString().padStart(2, "0")}</strong></span></div></div>
-            <GlassPanel className="admin-panel"><div className="admin-panel-head"><div><span className="eyebrow">PENDING / {adminPayments.length.toString().padStart(2, "0")}</span><h2>Payment requests</h2></div><span className="admin-note"><ShieldCheck size={15} />Receipt is attached to Telegram alert</span></div>{adminPayments.length ? <div className="admin-list">{adminPayments.map((payment) => <div className="admin-row" key={payment.id}><div className="avatar admin-user-avatar">{payment.username.slice(0, 1).toUpperCase()}</div><div className="admin-user"><strong>{payment.username}</strong><span>{formatDate(payment.createdAt)} · $80 USDT</span><code>{payment.id.slice(0, 8)}</code></div><div className="admin-actions"><button className="button button-approve" disabled={reviewingId === payment.id} onClick={() => reviewPayment(payment.id, "approved")}><Check size={15} />Approve</button><button className="button button-reject" disabled={reviewingId === payment.id} onClick={() => reviewPayment(payment.id, "rejected")}><X size={15} />Reject</button></div></div>)}</div> : <div className="admin-empty"><div className="empty-mark"><CheckCircle2 size={19} /></div><strong>Queue is clear.</strong><span>New transfer receipts will appear in Telegram and here.</span></div>}</GlassPanel>
-            <div className="footer-line"><span>ADMIN ACCESS</span><span>ACTIONS ARE RECORDED</span><span>PAYMENT REVIEW</span></div>
+            <div className="admin-queue">{adminPayments.length ? adminPayments.map((payment) => <GlassPanel key={payment.id} className="admin-card"><div className="admin-card-top"><div><strong>@{payment.username}</strong><span>{formatDate(payment.createdAt)}</span></div><span className="history-id">{payment.id.slice(0, 8).toUpperCase()}</span></div><div className="admin-card-body"><a className="button button-outline" href={`/api/admin/payments/${payment.id}/receipt`} target="_blank" rel="noreferrer"><FileImage size={16} />View receipt</a></div><div className="admin-card-actions"><button className="button button-primary" disabled={reviewingId === payment.id} onClick={() => reviewPayment(payment.id, "approved")}>Approve (30 days)</button><button className="button button-outline button-danger" disabled={reviewingId === payment.id} onClick={() => reviewPayment(payment.id, "rejected")}>Reject</button></div></GlassPanel>) : <GlassPanel className="empty-admin">No pending payments to review.</GlassPanel>}</div>
           </>}
         </motion.div>
       </section>
